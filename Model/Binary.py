@@ -10,6 +10,7 @@ from sklearn.metrics import classification_report, confusion_matrix, roc_auc_sco
 from sklearn.pipeline import Pipeline
 import matplotlib.pyplot as plt
 import seaborn as sns
+import os
 
 class CipherCloudBinaryClassifier:
     def __init__(self):
@@ -273,6 +274,36 @@ class CipherCloudBinaryClassifier:
             
             print(f"{name:20s} - Mean AUC: {cv_scores.mean():.3f} (+/- {cv_scores.std() * 2:.3f})")
 
+    def save_evaluation_plots(self, output_dir="Model/Evaluation_Plots"):
+        """Save confusion matrix and ROC curve images for each model."""
+        os.makedirs(output_dir, exist_ok=True)
+        for name, result in self.models.items():
+            y_pred = result['predictions']
+            y_proba = result['probabilities']
+            # Confusion Matrix
+            cm = confusion_matrix(self.y_test, y_pred)
+            plt.figure(figsize=(5,4))
+            sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=['Benign','Risky'], yticklabels=['Benign','Risky'])
+            plt.title(f"{name} - Confusion Matrix")
+            plt.xlabel("Predicted")
+            plt.ylabel("Actual")
+            plt.tight_layout()
+            plt.savefig(os.path.join(output_dir, f"{name}_confusion_matrix.png"))
+            plt.close()
+            # ROC Curve
+            fpr, tpr, _ = roc_curve(self.y_test, y_proba)
+            plt.figure(figsize=(5,4))
+            plt.plot(fpr, tpr, label=f"{name} (AUC={result['auc']:.2f})")
+            plt.plot([0,1],[0,1],'k--')
+            plt.xlabel("False Positive Rate")
+            plt.ylabel("True Positive Rate")
+            plt.title(f"{name} - ROC Curve")
+            plt.legend()
+            plt.tight_layout()
+            plt.savefig(os.path.join(output_dir, f"{name}_roc_curve.png"))
+            plt.close()
+        print(f"✅ Evaluation plots saved to {output_dir}")
+
 # Example usage
 def main():
     # Initialize classifier
@@ -298,6 +329,9 @@ def main():
     
     # Save best model
     classifier.save_model()
+    
+    # Save evaluation plots
+    classifier.save_evaluation_plots()
     
     print("\n🎯 CipherCloud Binary Classifier Training Complete!")
     print(f"Best Model: {classifier.best_model_name}")
