@@ -287,77 +287,34 @@ class IAMFeatureExtractor:
 
 # Example usage and ML pipeline
 def create_ml_pipeline():
-    """Example of how to use the feature extractor with scikit-learn"""
-    
-    from sklearn.model_selection import train_test_split, cross_val_score
-    from sklearn.ensemble import RandomForestClassifier
-    from sklearn.linear_model import LogisticRegression
-    from sklearn.metrics import classification_report, confusion_matrix
-    
+    """Process features and save them for model training/evaluation elsewhere."""
+    from sklearn.model_selection import train_test_split
+    from sklearn.preprocessing import StandardScaler
+
     # Initialize feature extractor
     extractor = IAMFeatureExtractor()
-    
+
     # Process dataset
     X_numeric, y, text_features = extractor.process_dataset("Dataset/cipher_cloud_dataset.json")
-    
+
     # Add TF-IDF features
     X_full = extractor.add_tfidf_features(X_numeric, text_features, max_features=50)
-    
-    # Split data
+
+    # Split data (optional, but no evaluation)
     X_train, X_test, y_train, y_test = train_test_split(
         X_full, y, test_size=0.2, random_state=42, stratify=y
     )
-    
-    # Scale features
+
+    # Scale features (optional, but no evaluation)
     scaler = StandardScaler()
     X_train_scaled = scaler.fit_transform(X_train)
     X_test_scaled = scaler.transform(X_test)
-    
-    # Train models
-    models = {
-        'Random Forest': RandomForestClassifier(n_estimators=100, random_state=42),
-        'Logistic Regression': LogisticRegression(random_state=42, max_iter=1000)
-    }
-    
-    results = {}
-    
-    for name, model in models.items():
-        print(f"\n=== {name} ===")
-        
-        # Fit model
-        if name == 'Random Forest':
-            model.fit(X_train, y_train)  # RF can handle unscaled features
-            y_pred = model.predict(X_test)
-        else:
-            model.fit(X_train_scaled, y_train)  # Use scaled features for LogReg
-            y_pred = model.predict(X_test_scaled)
-        
-        # Evaluate
-        print(f"Accuracy: {model.score(X_test_scaled if name != 'Random Forest' else X_test, y_test):.3f}")
-        print("\nClassification Report:")
-        print(classification_report(y_test, y_pred, target_names=['Benign', 'Risky']))
-        
-        # Feature importance (for Random Forest)
-        if name == 'Random Forest':
-            importances = pd.DataFrame({
-                'feature': X_full.columns,
-                'importance': model.feature_importances_
-            }).sort_values('importance', ascending=False)
-            
-            print("\nTop 10 Most Important Features:")
-            print(importances.head(10))
-        
-        results[name] = {
-            'model': model,
-            'accuracy': model.score(X_test_scaled if name != 'Random Forest' else X_test, y_test),
-            'predictions': y_pred
-        }
-    
+
     # Save processed data
     extractor.save_processed_data(X_full, y, "cipher_cloud_features")
-    
-    return results, extractor
+
+    return X_full, y, extractor
 
 if __name__ == "__main__":
-    # Run the complete pipeline
-    results, extractor = create_ml_pipeline()
+    # Only process and save features, no model training/evaluation
+    X_full, y, extractor = create_ml_pipeline()
