@@ -1,5 +1,6 @@
 import json
 import random
+import os
 from typing import List, Dict
 
 class PrivilegeEscalationGenerator:
@@ -270,8 +271,15 @@ def create_combined_dataset(privesc_samples: int = 2000, shadow_samples: int = 2
     
     return combined_data
 
-def save_dataset(dataset: List[Dict], filename: str = "cipher_cloud_attack_dataset.json"):
-    """Save dataset to JSON file"""
+def save_dataset(dataset: List[Dict], filename: str):
+    """Save dataset to JSON file in Classifier Dataset folder"""
+    # Create directory if it doesn't exist
+    os.makedirs("Classifier Dataset", exist_ok=True)
+    
+    # Update filename to include folder path
+    if not filename.startswith("Classifier Dataset/"):
+        filename = f"Classifier Dataset/{filename}"
+    
     with open(filename, 'w') as f:
         json.dump(dataset, f, indent=2)
     
@@ -374,15 +382,15 @@ if __name__ == "__main__":
     print("Generating separate datasets...")
     
     # Privilege Escalation only
-    PrivilegeEscalationOnly.generate_samples(2000, "privilege_escalation_only.json")
+    PrivilegeEscalationOnly.generate_samples(2000, "privilege_escalation.json")
     
     # Shadow Admin only  
-    ShadowAdminOnly.generate_samples(2000, "shadow_admin_only.json")
+    ShadowAdminOnly.generate_samples(2000, "shadow_admin.json")
     
     print("\n✅ All datasets generated!")
-    print("\n📁 Files created:")
+    print("\n📁 Files created in 'Classifier Dataset' folder:")
     print("  - cipher_cloud_privesc_shadow_combined.json (4000 samples)")
-    print("  - privilege_escalation_only.json (2000 samples)")
-    print("  - shadow_admin_only.json (2000 samples)")
+    print("  - privilege_escalation.json (2000 samples)")
+    print("  - shadow_admin.json (2000 samples)")
     print("\n🏷️  Labels: 'Privilege Escalation' and 'Shadow Admin'")
     print("🤖 Ready for multi-class classifier training!")
