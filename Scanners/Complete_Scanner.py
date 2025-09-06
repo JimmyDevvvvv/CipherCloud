@@ -217,10 +217,16 @@ class CompleteCipherCloudScanner:
         # Load family model
         try:
             self.family_model_data = joblib.load(family_model_path)
+            print("DEBUG: family_model_data keys:", self.family_model_data.keys())
             self.family_model = self.family_model_data['model']
             self.family_scaler = self.family_model_data['scaler']
             self.family_features = self.family_model_data['feature_names']
-            self.attack_families = self.family_model_data['label_encoder'].classes_
+            # Try to get the label encoder from possible keys
+            if 'attack_families' in self.family_model_data:
+                self.attack_families = self.family_model_data['attack_families']
+            else:
+                print("❌ Attack families not found in family model data. Available keys:", self.family_model_data.keys())
+                self.attack_families = []
             print(f"✅ Family Model Loaded: {type(self.family_model).__name__}")
             print(f"✅ Attack Families: {len(self.attack_families)} types loaded")
         except FileNotFoundError:
@@ -257,9 +263,14 @@ class CompleteCipherCloudScanner:
         feature_df = feature_df.reindex(columns=self.binary_features, fill_value=0)
         
         # Scale and predict
-        features_scaled = self.binary_scaler.transform(feature_df)
+        features_scaled = pd.DataFrame(
+            self.binary_scaler.transform(feature_df),
+            columns=self.binary_features
+        )
+        
         prediction = self.binary_model.predict(features_scaled)[0]
         probabilities = self.binary_model.predict_proba(features_scaled)[0]
+
         
         return {
             'is_risky': bool(prediction == 1),
@@ -267,51 +278,61 @@ class CompleteCipherCloudScanner:
             'benign_probability': float(probabilities[0]),
             'confidence': float(probabilities[1] if prediction == 1 else probabilities[0])
         }
-
+    
     def family_scan(self, policy: Dict) -> Dict[str, Any]:
-        """Stage 2: Attack family classification"""
-        
         if self.family_model is None:
             return {'error': 'Family model not available'}
-        
-        # Extract family features
+
+        # Extract structured features
         features = self.family_extractor.extract_all_features(policy)
         feature_df = pd.DataFrame([features])
-        
-        # Handle text features (drop for simplified approach)
-        text_columns = ['actions_text', 'resources_text']
-        feature_df = feature_df.drop(columns=[col for col in text_columns if col in feature_df.columns], errors='ignore')
-        
-        # Convert boolean to int
+
+        # Convert bools to int
         bool_columns = feature_df.select_dtypes(include=[bool]).columns
         feature_df[bool_columns] = feature_df[bool_columns].astype(int)
-        
-        # Align with training features
-        for feature in self.family_features:
-            if feature not in feature_df.columns:
-                feature_df[feature] = 0
-        
-        feature_df = feature_df.reindex(columns=self.family_features, fill_value=0)
-        
-        # Scale and predict
-        features_scaled = self.family_scaler.transform(feature_df)
-        prediction = self.family_model.predict(features_scaled)[0]
-        probabilities = self.family_model.predict_proba(features_scaled)[0]
-        
-        # Get top 3 predictions
+
+        # Use the same TF-IDF vectorizer saved with the model
+        tfidf = self.family_model_data["tfidf"]
+        tfidf_features = tfidf.transform(feature_df["actions_text"].fillna("")).toarray()
+        tfidf_df = pd.DataFrame(
+            tfidf_features,
+            columns=[f"tfidf_{i}" for i in range(tfidf_features.shape[1])]
+        )
+
+        # Merge structured + tfidf
+        X = pd.concat([
+            feature_df.drop(columns=["actions_text", "resources_text"], errors="ignore"),
+            tfidf_df
+        ], axis=1)
+
+        # --- Critical Fix: Ensure ALL training features exist ---
+        for col in self.family_features:
+            if col not in X.columns:
+                X[col] = 0
+
+        # Enforce exact column order from training
+        X = X[self.family_features]
+
+        # Scale + predict
+        X_scaled = pd.DataFrame(
+        self.family_scaler.transform(X),
+        columns=self.family_features
+        )
+
+        prediction = self.family_model.predict(X_scaled)[0]
+        probabilities = self.family_model.predict_proba(X_scaled)[0]
+
+        # Top-3 predictions
         top_3_indices = np.argsort(probabilities)[-3:][::-1]
         top_3_predictions = [
-            {
-                'family': self.attack_families[idx],
-                'probability': float(probabilities[idx])
-            }
+            {"family": self.attack_families[idx], "probability": float(probabilities[idx])}
             for idx in top_3_indices
         ]
-        
+
         return {
-            'primary_attack_family': self.attack_families[prediction],
-            'confidence': float(probabilities[prediction]),
-            'top_3_predictions': top_3_predictions
+            "primary_attack_family": self.attack_families[prediction],
+            "confidence": float(probabilities[prediction]),
+            "top_3_predictions": top_3_predictions
         }
 
     def complete_scan(self, policy: Dict) -> Dict[str, Any]:
