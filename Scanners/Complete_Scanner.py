@@ -197,8 +197,8 @@ class AttackFamilyFeatureExtractor:
 
 class CompleteCipherCloudScanner:
     def __init__(self, 
-                 binary_model_path: str = "cipher_cloud_binary_model.pkl",
-                 family_model_path: str = "cipher_cloud_family_model.pkl"):
+                 binary_model_path: str = "Models/cipher_cloud_binary_model.pkl",
+                 family_model_path: str = "Models/cipher_cloud_family_model.pkl"):
         """Initialize both binary and family models"""
         
         print("🔄 Loading CipherCloud AI Models...")

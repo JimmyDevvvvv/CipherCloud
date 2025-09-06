@@ -126,7 +126,7 @@ class IAMFeatureExtractor:
         return features
 
 class CipherCloudScanner:
-    def __init__(self, model_path: str = "cipher_cloud_binary_model.pkl"):
+    def __init__(self, model_path: str = "Models/cipher_cloud_binary_model.pkl"):
         """Initialize the scanner with your trained model"""
         
         # Load the trained model
